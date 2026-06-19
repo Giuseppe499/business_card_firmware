@@ -39,7 +39,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(main
-    main.c
+    main.cpp
     )
 
 # pull in common dependencies

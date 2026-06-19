@@ -11,6 +11,8 @@
 
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
+#include "hardware/gpio.h"
+const uint BUTTON_PINS[] = {0,1,2};
 
 #endif
 
@@ -39,11 +41,11 @@ static int16_t sine_wave_table[SINE_WAVE_TABLE_LEN];
 struct audio_buffer_pool *init_audio() {
 
     static audio_format_t audio_format = {
-            .format = AUDIO_BUFFER_FORMAT_PCM_S16,
 #if USE_AUDIO_SPDIF
             .sample_freq = 44100,
 #else
             .sample_freq = 24000,
+            .format = AUDIO_BUFFER_FORMAT_PCM_S16,
 #endif
             .channel_count = 1,
     };
@@ -99,6 +101,10 @@ int main() {
 #if USE_AUDIO_PWM
     set_sys_clock_48mhz();
 #endif
+for (uint gpio_pin : BUTTON_PINS){
+    gpio_init(gpio_pin);
+    gpio_set_dir(gpio_pin, GPIO_IN);
+}
 #endif
 
     stdio_init_all();
@@ -138,6 +144,11 @@ int main() {
 #else
             printf("vol = %d, step = %d      \r", vol, step >> 16);
 #endif
+        }
+        for(uint gpio_pin : BUTTON_PINS) {
+            if (gpio_get(gpio_pin)) {
+                printf("Button %d pressed\n", gpio_pin);
+            }
         }
         struct audio_buffer *buffer = take_audio_buffer(ap, true);
         int16_t *samples = (int16_t *) buffer->buffer->bytes;
