@@ -61,8 +61,8 @@ target_compile_definitions(main PRIVATE
             PICO_AUDIO_I2S_MONO_INPUT=1
             #define for our example code
             USE_AUDIO_I2S=1
-           PICO_AUDIO_I2S_DATA_PIN=6
-           PICO_AUDIO_I2S_CLOCK_PIN_BASE=14
+            PICO_AUDIO_I2S_DATA_PIN=6
+            PICO_AUDIO_I2S_CLOCK_PIN_BASE=14
 #            PICO_DEFAULT_UART=0
 #            PICO_DEFAULT_UART_TX_PIN=28
 #            PICO_DEFAULT_UART_RX_PIN=29
