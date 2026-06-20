@@ -43,6 +43,9 @@ struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
 #if USE_AUDIO_SPDIF
             .sample_freq = 44100,
+#elif USE_AUDIO_I2S
+            .sample_freq = 44100,
+            .format = AUDIO_BUFFER_FORMAT_PCM_S16,
 #else
             .sample_freq = 24000,
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
