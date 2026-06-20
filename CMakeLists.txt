@@ -36,10 +36,12 @@ project(main C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-# Add executable. Default name is the project name, version 0.1
+# Add all .cpp files in the root of the project as sources
+file(GLOB SOURCES "*.cpp")
 
+# Add executable. Default name is the project name, version 0.1
 add_executable(main
-    main.cpp
+    ${SOURCES}
     )
 
 # pull in common dependencies
