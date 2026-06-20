@@ -70,5 +70,8 @@ target_compile_definitions(main PRIVATE
 #            PICO_DEFAULT_UART_RX_PIN=29
             )
 
+# Enable C++20 features
+target_compile_features(main PRIVATE cxx_std_20)
+
 # create map/bin/hex file etc.
 pico_add_extra_outputs(main)

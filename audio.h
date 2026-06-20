@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <array>
+#include <cmath>
 
 #define SINE_WAVE_TABLE_LEN 2048
 #define SAMPLES_PER_BUFFER 256
@@ -27,12 +29,12 @@ bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_C
 struct audio_buffer_pool *init_audio();
 
 
-consteval int16_t[] populate_sine_wave_table() {
-    int16_t table[SINE_WAVE_TABLE_LEN];
+consteval std::array<int16_t, SINE_WAVE_TABLE_LEN> populate_sine_wave_table() {
+    std::array<int16_t, SINE_WAVE_TABLE_LEN> table{};
     for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
-        table[i] = 32767 * cosf(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
+        table[i] = 32767 * std::cos(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
     }
     return table;
 }
 
-constexpr int16_t sine_wave_table[SINE_WAVE_TABLE_LEN] = populate_sine_wave_table();
+constexpr auto sine_wave_table = populate_sine_wave_table();

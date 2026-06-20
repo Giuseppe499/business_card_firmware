@@ -5,7 +5,6 @@
  */
 
 #include <stdio.h>
-#include <math.h>
 
 #if PICO_ON_DEVICE
 
@@ -27,10 +26,6 @@ int main() {
     #endif
 
     stdio_init_all();
-
-    for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
-        sine_wave_table[i] = 32767 * cosf(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
-    }
 
     struct audio_buffer_pool *ap = init_audio();
     uint32_t step = 0x200000;
