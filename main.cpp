@@ -5,16 +5,25 @@
  */
 
 #include <stdio.h>
+#include <array>
+#include "pico/stdlib.h"
+#include "audio.h"
 
 #if PICO_ON_DEVICE
 
 #include "hardware/gpio.h"
-const uint BUTTON_PINS[] = {0,1,2};
+constexpr uint BUTTON_PINS[] = {0,1,2};
+constexpr float FREQS[] = {261.63, 293.66, 329.63};
+consteval std::array<uint32_t, sizeof(FREQS)/sizeof(FREQS[0])> populate_steps() {
+    std::array<uint32_t, sizeof(FREQS)/sizeof(FREQS[0])> steps{};
+    for (int i = 0; i < steps.size(); i++) {
+        steps[i] = step_size_for_freq(FREQS[i]);
+    }
+    return steps;
+}
+constexpr auto STEPS = populate_steps();
 
 #endif
-
-#include "pico/stdlib.h"
-#include "audio.h"
 
 int main() {
     #if PICO_ON_DEVICE
@@ -23,16 +32,16 @@ int main() {
         gpio_init(gpio_pin);
         gpio_set_dir(gpio_pin, GPIO_IN);
     }
+    uint32_t positions[sizeof(BUTTON_PINS)/sizeof(BUTTON_PINS[0])] = {0};
     #endif
+
+    uint32_t pos_max = STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN;
+    uint vol = 64;
 
     stdio_init_all();
 
     struct audio_buffer_pool *ap = init_audio();
-    // Compute the step size for a 440Hz tone
-    uint32_t step = step_size_for_freq(440);
-    uint32_t pos = 0;
-    uint32_t pos_max = STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN;
-    uint vol = 128;
+
     while (true) {
 #if USE_AUDIO_PWM
         enum audio_correction_mode m = audio_pwm_get_correction_mode();
@@ -41,8 +50,6 @@ int main() {
         if (c >= 0) {
             if (c == '-' && vol) vol -= 4;
             if ((c == '=' || c == '+') && vol < 255) vol += 4;
-            if (c == '[' && step > STEP_MULTIPLIER) step -= STEP_MULTIPLIER;
-            if (c == ']' && step < (SINE_WAVE_TABLE_LEN / 8) * STEP_MULTIPLIER) step += STEP_MULTIPLIER;
             if (c == 'q') break;
 #if USE_AUDIO_PWM
             if (c == 'c') {
@@ -55,22 +62,29 @@ int main() {
                     done = audio_pwm_set_correction_mode(m);
                 }
             }
-            printf("vol = %d, freq = %f, step = %d mode = %d      \r", vol, freq_for_step_size(step), step / STEP_MULTIPLIER, m);
+            printf("vol = %d, mode = %d      \r", vol, m);
 #else
-            printf("vol = %d, freq = %f, step = %d      \r", vol, freq_for_step_size(step), step / STEP_MULTIPLIER);
+            printf("vol = %d,      \r", vol);
 #endif
-        }
-        for(uint gpio_pin : BUTTON_PINS) {
-            if (gpio_get(gpio_pin)) {
-                printf("Button %d pressed\n", gpio_pin);
-            }
         }
         struct audio_buffer *buffer = take_audio_buffer(ap, true);
         int16_t *samples = (int16_t *) buffer->buffer->bytes;
         for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] = (vol * sine_wave_table[pos / STEP_MULTIPLIER]) >> 8u;
-            pos += step;
-            if (pos >= pos_max) pos -= pos_max;
+            samples[i] = 0;
+        }
+        int j = 0;
+        for(uint gpio_pin : BUTTON_PINS) {
+            if (gpio_get(gpio_pin)) {
+                for (uint i = 0; i < buffer->max_sample_count; i++) {
+                    samples[i] += (vol * sine_wave_table[positions[j] / STEP_MULTIPLIER]) >> 8u;
+                    positions[j] += STEPS[j];
+                    if (positions[j] >= pos_max) positions[j] -= pos_max;
+                }
+            }
+            else {
+                positions[j] = 0;
+            }
+            j++;
         }
         buffer->sample_count = buffer->max_sample_count;
         give_audio_buffer(ap, buffer);
