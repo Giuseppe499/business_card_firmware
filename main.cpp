@@ -28,9 +28,10 @@ int main() {
     stdio_init_all();
 
     struct audio_buffer_pool *ap = init_audio();
-    uint32_t step = 0x200000;
+    // Compute the step size for a 440Hz tone
+    uint32_t step = step_size_for_freq(440);
     uint32_t pos = 0;
-    uint32_t pos_max = 0x10000 * SINE_WAVE_TABLE_LEN;
+    uint32_t pos_max = STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN;
     uint vol = 128;
     while (true) {
 #if USE_AUDIO_PWM
@@ -40,8 +41,8 @@ int main() {
         if (c >= 0) {
             if (c == '-' && vol) vol -= 4;
             if ((c == '=' || c == '+') && vol < 255) vol += 4;
-            if (c == '[' && step > 0x10000) step -= 0x10000;
-            if (c == ']' && step < (SINE_WAVE_TABLE_LEN / 16) * 0x20000) step += 0x10000;
+            if (c == '[' && step > STEP_MULTIPLIER) step -= STEP_MULTIPLIER;
+            if (c == ']' && step < (SINE_WAVE_TABLE_LEN / 8) * STEP_MULTIPLIER) step += STEP_MULTIPLIER;
             if (c == 'q') break;
 #if USE_AUDIO_PWM
             if (c == 'c') {
@@ -54,9 +55,9 @@ int main() {
                     done = audio_pwm_set_correction_mode(m);
                 }
             }
-            printf("vol = %d, step = %d mode = %d      \r", vol, step >>16, m);
+            printf("vol = %d, freq = %f, step = %d mode = %d      \r", vol, freq_for_step_size(step), step / STEP_MULTIPLIER, m);
 #else
-            printf("vol = %d, step = %d      \r", vol, step >> 16);
+            printf("vol = %d, freq = %f, step = %d      \r", vol, freq_for_step_size(step), step / STEP_MULTIPLIER);
 #endif
         }
         for(uint gpio_pin : BUTTON_PINS) {
@@ -67,7 +68,7 @@ int main() {
         struct audio_buffer *buffer = take_audio_buffer(ap, true);
         int16_t *samples = (int16_t *) buffer->buffer->bytes;
         for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
+            samples[i] = (vol * sine_wave_table[pos / STEP_MULTIPLIER]) >> 8u;
             pos += step;
             if (pos >= pos_max) pos -= pos_max;
         }
