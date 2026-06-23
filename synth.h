@@ -50,13 +50,13 @@ class AdditiveSynth : public Synth {
 private:
     size_t num_harmonics;
     float* harmonics;
-    float* amplitudes;
+    uint16_t* amplitudes;
     SineOscillator* oscillators;
 protected:
-    void initialize_harmonics(size_t num_harmonics, float* harmonics, float* amplitudes) {
+    void initialize_harmonics(size_t num_harmonics, float* harmonics, uint16_t* amplitudes) {
         this->num_harmonics = num_harmonics;
         this->harmonics = new float[num_harmonics];
-        this->amplitudes = new float[num_harmonics];
+        this->amplitudes = new uint16_t[num_harmonics];
         this->oscillators = new SineOscillator[num_harmonics];
         for (size_t i = 0; i < num_harmonics; i++) {
             this->harmonics[i] = harmonics[i];
@@ -64,12 +64,23 @@ protected:
             this->oscillators[i] = SineOscillator(this->frequency * harmonics[i]);
         }
     }
+    uint16_t* float_to_uint16(float* arr, size_t size) {
+        uint16_t* result = new uint16_t[size];
+        for (size_t i = 0; i < size; i++) {
+            result[i] = (uint16_t)(arr[i] * ((1 << 16) - 1));
+        }
+        return result;
+    }
 public:
     AdditiveSynth() : Synth(0), num_harmonics(0), harmonics(nullptr), amplitudes(nullptr), oscillators(nullptr) {};
     AdditiveSynth(float freq) : Synth(freq), num_harmonics(0), harmonics(nullptr), amplitudes(nullptr), oscillators(nullptr) {};
-    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, float* amplitudes)
+    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, uint16_t* amplitudes)
         : Synth(freq) {
         initialize_harmonics(num_harmonics, harmonics, amplitudes);
+    }
+    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, float* amplitudes)
+        : Synth(freq) {
+        initialize_harmonics(num_harmonics, harmonics, float_to_uint16(amplitudes, num_harmonics));
     }
 
     ~AdditiveSynth() {
@@ -79,11 +90,11 @@ public:
     }
 
     int16_t next_sample() override {
-        int16_t sample = 0;
+        int32_t sample = 0;
         for (size_t i = 0; i < num_harmonics; i++) {
             sample += amplitudes[i] * oscillators[i].next_sample();
         }
-        return sample;
+        return sample >> 16;
     }
 
     void reset() override {
@@ -97,8 +108,8 @@ class OrganSynth : public AdditiveSynth {
 public:
     OrganSynth() : AdditiveSynth(0) {};
     OrganSynth(float freq) : AdditiveSynth(freq) {
-        float harmonics[] = {1, 1.5, 2, 3, 4, 5, 6, 8};
-        float amplitudes[] = {1, 0.5, 0.3, 0.2, 0.1, 0.1, 0.1, 0.1};
+        float harmonics[] = {.25, .5, 1, 1.5, 2, 3, 4, 5, 6, 8};
+        float amplitudes[] = {0.6, 0.3, 1, 0.5, .3, .2, .1, .1, .1, .1};
         float sum_amplitudes = 0;
         for (float amp : amplitudes) {
             sum_amplitudes += amp;
@@ -110,6 +121,6 @@ public:
         // for (size_t i = 0; i < num_harmonics; i++) {
         //     harmonics[i] *= freq;
         // }
-        this->initialize_harmonics(num_harmonics, harmonics, amplitudes);
+        this->initialize_harmonics(num_harmonics, harmonics, float_to_uint16(amplitudes, num_harmonics));
     };
 };
