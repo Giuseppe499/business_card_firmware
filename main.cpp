@@ -8,37 +8,33 @@
 #include <array>
 #include "pico/stdlib.h"
 #include "audio.h"
+#include "synth.h"
 
 #if PICO_ON_DEVICE
 
 #include "hardware/gpio.h"
 constexpr uint BUTTON_PINS[] = {0,1,2};
 constexpr float FREQS[] = {261.63, 293.66, 329.63};
-consteval std::array<uint32_t, sizeof(FREQS)/sizeof(FREQS[0])> populate_steps() {
-    std::array<uint32_t, sizeof(FREQS)/sizeof(FREQS[0])> steps{};
-    for (int i = 0; i < steps.size(); i++) {
-        steps[i] = step_size_for_freq(FREQS[i]);
-    }
-    return steps;
-}
-constexpr auto STEPS = populate_steps();
 
 #endif
 
 int main() {
+    stdio_init_all();
+
     #if PICO_ON_DEVICE
     // Setup GPIO for buttons
     for (uint gpio_pin : BUTTON_PINS){
         gpio_init(gpio_pin);
         gpio_set_dir(gpio_pin, GPIO_IN);
     }
-    uint32_t positions[sizeof(BUTTON_PINS)/sizeof(BUTTON_PINS[0])] = {0};
     #endif
 
-    uint32_t pos_max = STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN;
     uint vol = 64;
 
-    stdio_init_all();
+    std::array<Synth*, sizeof(BUTTON_PINS)/sizeof(BUTTON_PINS[0])> oscillators;
+    for (size_t i = 0; i < oscillators.size(); i++) {
+        oscillators[i] = new OrganSynth(FREQS[i]);
+    }
 
     struct audio_buffer_pool *ap = init_audio();
 
@@ -76,19 +72,22 @@ int main() {
         for(uint gpio_pin : BUTTON_PINS) {
             if (gpio_get(gpio_pin)) {
                 for (uint i = 0; i < buffer->max_sample_count; i++) {
-                    samples[i] += (vol * sine_wave_table[positions[j] / STEP_MULTIPLIER]) >> 8u;
-                    positions[j] += STEPS[j];
-                    if (positions[j] >= pos_max) positions[j] -= pos_max;
+                    samples[i] += (oscillators[j]->next_sample() >> 8);
                 }
             }
-            else {
-                positions[j] = 0;
-            }
             j++;
+        }
+        for (uint i = 0; i < buffer->max_sample_count; i++) {
+            samples[i] *= vol;
         }
         buffer->sample_count = buffer->max_sample_count;
         give_audio_buffer(ap, buffer);
     }
-    puts("\n");
+
+    // Cleanup
+    for (size_t i = 0; i < oscillators.size(); i++) {
+        delete oscillators[i];
+    }
+
     return 0;
 }

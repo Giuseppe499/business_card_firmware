@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdint.h>
 #include <array>
 #include <cmath>
@@ -28,6 +30,7 @@ struct audio_buffer_pool *init_audio();
 #define SINE_WAVE_TABLE_LEN 2048
 #define SAMPLES_PER_BUFFER 256
 #define STEP_MULTIPLIER 0x10000
+#define MAX_POSITION (STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN)
 
 constexpr float sine_freq = AUDIO_SAMPLE_FREQ / (float)SINE_WAVE_TABLE_LEN;
 
