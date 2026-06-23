@@ -13,8 +13,8 @@
 #if PICO_ON_DEVICE
 
 #include "hardware/gpio.h"
-constexpr uint BUTTON_PINS[] = {0,1,2};
-constexpr float FREQS[] = {261.63, 293.66, 329.63};
+constexpr uint BUTTON_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
+constexpr float FREQS[] = {261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25};
 
 #endif
 
