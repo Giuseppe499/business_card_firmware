@@ -26,6 +26,7 @@ int main() {
     for (uint gpio_pin : BUTTON_PINS){
         gpio_init(gpio_pin);
         gpio_set_dir(gpio_pin, GPIO_IN);
+        gpio_set_pulls(gpio_pin, false, false);
     }
     #endif
 
