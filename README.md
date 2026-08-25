@@ -1,3 +1,29 @@
+# Fedora dependencies
+
+To install the required dependencies on Fedora, run the following command:
+
+```bash
+sudo dnf install gcc-arm-linux-gnu \
+ arm-none-eabi-gcc-cs-c++ \
+ arm-none-eabi-gcc-cs \
+ arm-none-eabi-binutils \
+ arm-none-eabi-newlib
+```
+
+# pico-sdk submodules initialization
+
+To compile the project, you might need to initialize the submodules of the pico-sdk. To do so, move to the `pico-sdk` directory
+
+```bash
+cd pico-sdk
+```
+
+and run the following command:
+
+```bash
+git submodule update --init
+```
+
 # Build
 
 Run `cmake` to generate the build files in the `build` directory:
