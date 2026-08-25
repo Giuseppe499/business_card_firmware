@@ -50,51 +50,41 @@ class AdditiveSynth : public Synth {
 private:
     size_t num_harmonics;
     float* harmonics;
-    uint16_t* amplitudes;
+    int16_t* amplitudes_fractions;
     SineOscillator* oscillators;
 protected:
-    void initialize_harmonics(size_t num_harmonics, float* harmonics, uint16_t* amplitudes) {
+    void initialize_harmonics(size_t num_harmonics, float* harmonics, int16_t* amplitudes_fractions) {
         this->num_harmonics = num_harmonics;
         this->harmonics = new float[num_harmonics];
-        this->amplitudes = new uint16_t[num_harmonics];
+        this->amplitudes_fractions = new int16_t[num_harmonics];
         this->oscillators = new SineOscillator[num_harmonics];
         for (size_t i = 0; i < num_harmonics; i++) {
             this->harmonics[i] = harmonics[i];
-            this->amplitudes[i] = amplitudes[i];
+            this->amplitudes_fractions[i] = amplitudes_fractions[i];
             this->oscillators[i] = SineOscillator(this->frequency * harmonics[i]);
         }
     }
-    uint16_t* float_to_uint16(float* arr, size_t size) {
-        uint16_t* result = new uint16_t[size];
-        for (size_t i = 0; i < size; i++) {
-            result[i] = (uint16_t)(arr[i] * ((1 << 16) - 1));
-        }
-        return result;
-    }
+
 public:
-    AdditiveSynth() : Synth(0), num_harmonics(0), harmonics(nullptr), amplitudes(nullptr), oscillators(nullptr) {};
-    AdditiveSynth(float freq) : Synth(freq), num_harmonics(0), harmonics(nullptr), amplitudes(nullptr), oscillators(nullptr) {};
-    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, uint16_t* amplitudes)
+    AdditiveSynth() : Synth(0), num_harmonics(0), harmonics(nullptr), amplitudes_fractions(nullptr), oscillators(nullptr) {};
+    AdditiveSynth(float freq) : Synth(freq), num_harmonics(0), harmonics(nullptr), amplitudes_fractions(nullptr), oscillators(nullptr) {};
+    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, int16_t* amplitudes_fractions)
         : Synth(freq) {
-        initialize_harmonics(num_harmonics, harmonics, amplitudes);
-    }
-    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, float* amplitudes)
-        : Synth(freq) {
-        initialize_harmonics(num_harmonics, harmonics, float_to_uint16(amplitudes, num_harmonics));
+        initialize_harmonics(num_harmonics, harmonics, amplitudes_fractions);
     }
 
     ~AdditiveSynth() {
         delete[] harmonics;
-        delete[] amplitudes;
+        delete[] amplitudes_fractions;
         delete[] oscillators;
     }
 
     int16_t next_sample() override {
-        int32_t sample = 0;
+        int16_t sample = 0;
         for (size_t i = 0; i < num_harmonics; i++) {
-            sample += amplitudes[i] * oscillators[i].next_sample();
+            sample += oscillators[i].next_sample() / amplitudes_fractions[i];
         }
-        return sample >> 16;
+        return sample;
     }
 
     void reset() override {
@@ -114,13 +104,18 @@ public:
         for (float amp : amplitudes) {
             sum_amplitudes += amp;
         }
+        sum_amplitudes *= 1.1; // Slightly increase the sum to avoid clipping
         for (float& amp : amplitudes) {
             amp /= sum_amplitudes;
         }
         size_t num_harmonics = sizeof(harmonics) / sizeof(harmonics[0]);
+        int16_t amplitudes_fractions[num_harmonics];
+        for (size_t i = 0; i < num_harmonics; i++) {
+            amplitudes_fractions[i] = 1/amplitudes[i];
+        }
         // for (size_t i = 0; i < num_harmonics; i++) {
         //     harmonics[i] *= freq;
         // }
-        this->initialize_harmonics(num_harmonics, harmonics, float_to_uint16(amplitudes, num_harmonics));
+        this->initialize_harmonics(num_harmonics, harmonics, amplitudes_fractions);
     };
 };
