@@ -30,7 +30,7 @@ public:
     }
 
     int16_t next_sample() override {
-        int16_t sample = sine_wave_table[position >> 16];
+        int16_t sample = sine_wave_table[position / STEP_MULTIPLIER];
         position = (position + step_size) % MAX_POSITION;
         return sample;
     }
