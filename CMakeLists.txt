@@ -26,6 +26,7 @@ endif()
 set(PICO_BOARD pico_w CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
+set(PICO_SDK_PATH ${CMAKE_SOURCE_DIR}/pico-sdk)
 include(pico_sdk_import.cmake)
 # We also need PICO EXTRAS
 set(PICO_EXTRAS_PATH ${CMAKE_SOURCE_DIR}/pico-extras)
