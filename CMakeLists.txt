@@ -45,6 +45,9 @@ add_executable(main
     ${SOURCES}
     )
 
+# Add fpm include directory
+target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/fpm/include)
+
 # pull in common dependencies
 target_link_libraries(main
     pico_stdlib

@@ -4,3 +4,6 @@
 [submodule "pico-sdk"]
 	path = pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "fpm"]
+	path = fpm
+	url = https://github.com/Giuseppe499/fpm.git

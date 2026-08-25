@@ -82,9 +82,9 @@ int main() {
             }
             j++;
         }
-        std::array<int16_t, SAMPLES_PER_BUFFER> organ_samples = organ_synth.next_samples<SAMPLES_PER_BUFFER>(notes_idxs);
+        std::array<amplitude_t, SAMPLES_PER_BUFFER> organ_samples = organ_synth.next_samples<SAMPLES_PER_BUFFER>(notes_idxs);
         for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] = organ_samples[i];
+            samples[i] = static_cast<int16_t>(organ_samples[i] / 255 * vol * 32767);
         }
         buffer->sample_count = buffer->max_sample_count;
         give_audio_buffer(ap, buffer);
