@@ -64,11 +64,9 @@ int main() {
         }
         struct audio_buffer *buffer = take_audio_buffer(ap, true);
         int16_t *samples = (int16_t *) buffer->buffer->bytes;
-        for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] = 0;
-        }
-        int j = 0;
+
         std::vector<int> notes_idxs;
+        int j = 0;
         for(uint gpio_pin : BUTTON_PINS) {
             if (gpio_get(gpio_pin)) {
                 notes_idxs.push_back(j);
