@@ -49,10 +49,12 @@ private:
 };
 
 constexpr float base_freq = 261.63; // C4
-constexpr int lowest_note = -12*3; // C1
-constexpr int highest_note = 12*2; // C6
+constexpr int lowest_octave = -2; // C1
+constexpr int lowest_note = 12*lowest_octave; // C1
+constexpr int highest_octave = 2; // C6
+constexpr int highest_note = 12*(highest_octave+1); // C6
 constexpr int base_freq_idx = -lowest_note;
-constexpr int lowest_tonewheel_note = lowest_note - 12;
+constexpr int lowest_tonewheel_note = lowest_note - 12*2; // C-1
 constexpr int highest_tonewheel_note = highest_note + 12*3;
 constexpr int num_tonewheel_notes = highest_tonewheel_note - lowest_tonewheel_note + 1;
 constexpr std::array<uint32_t, num_tonewheel_notes> organ_step_sizes = []() {

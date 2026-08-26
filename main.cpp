@@ -32,6 +32,7 @@ int main() {
     #endif
 
     uint vol = 64;
+    int octave_shift = 0;
 
     OrganSynth organ_synth = OrganSynth();
 
@@ -45,6 +46,14 @@ int main() {
         if (c >= 0) {
             if (c == '-' && vol) vol -= 4;
             if ((c == '=' || c == '+') && vol < 255) vol += 4;
+            if (c == 'w') {
+                octave_shift++;
+                if (octave_shift > highest_octave) octave_shift = highest_octave;
+            }
+            if (c == 's') {
+                octave_shift--;
+                if (octave_shift < lowest_octave) octave_shift = lowest_octave;
+            }
             if (c == 'q') break;
 #if USE_AUDIO_PWM
             if (c == 'c') {
@@ -57,16 +66,16 @@ int main() {
                     done = audio_pwm_set_correction_mode(m);
                 }
             }
-            printf("vol = %d, mode = %d      \r", vol, m);
+            printf("vol = %d, octave_shift = %d, mode = %d\r", vol, octave_shift, m);
 #else
-            printf("vol = %d,      \r", vol);
+            printf("vol = %d, octave_shift = %d\r", vol, octave_shift);
 #endif
         }
         struct audio_buffer *buffer = take_audio_buffer(ap, true);
         int16_t *samples = (int16_t *) buffer->buffer->bytes;
 
         std::vector<int> notes_idxs;
-        int j = 0;
+        int j = octave_shift*12; // Start from the lowest note of the current octave shift
         for(uint gpio_pin : BUTTON_PINS) {
             if (gpio_get(gpio_pin)) {
                 notes_idxs.push_back(j);
