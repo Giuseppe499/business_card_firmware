@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <array>
+#include <vector>
 #include "pico/stdlib.h"
 #include "audio.h"
 #include "synth.h"
@@ -14,7 +15,7 @@
 
 #include "hardware/gpio.h"
 constexpr uint BUTTON_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
-constexpr float FREQS[] = {261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392.00, 415.30, 440.00, 466.16, 493.88, 523.25};
+constexpr int NUM_BUTTONS = sizeof(BUTTON_PINS) / sizeof(BUTTON_PINS[0]);
 
 #endif
 
@@ -32,10 +33,7 @@ int main() {
 
     uint vol = 64;
 
-    std::array<Synth*, sizeof(BUTTON_PINS)/sizeof(BUTTON_PINS[0])> oscillators;
-    for (size_t i = 0; i < oscillators.size(); i++) {
-        oscillators[i] = new OrganSynth(FREQS[i]);
-    }
+    OrganSynth organ_synth = OrganSynth();
 
     struct audio_buffer_pool *ap = init_audio();
 
@@ -70,24 +68,19 @@ int main() {
             samples[i] = 0;
         }
         int j = 0;
+        std::vector<int> notes_idxs;
         for(uint gpio_pin : BUTTON_PINS) {
             if (gpio_get(gpio_pin)) {
-                for (uint i = 0; i < buffer->max_sample_count; i++) {
-                    samples[i] += (oscillators[j]->next_sample() >> 8);
-                }
+                notes_idxs.push_back(j);
             }
             j++;
         }
+        std::array<int16_t, SAMPLES_PER_BUFFER> organ_samples = organ_synth.next_samples<SAMPLES_PER_BUFFER>(notes_idxs);
         for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] *= vol;
+            samples[i] = organ_samples[i];
         }
         buffer->sample_count = buffer->max_sample_count;
         give_audio_buffer(ap, buffer);
-    }
-
-    // Cleanup
-    for (size_t i = 0; i < oscillators.size(); i++) {
-        delete oscillators[i];
     }
 
     return 0;

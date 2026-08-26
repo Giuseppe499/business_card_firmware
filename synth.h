@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include "audio.h"
 #include <tuple>
+#include <array>
+#include <vector>
 
 class Synth {
     public:
@@ -23,6 +25,7 @@ class SineOscillator : public Synth {
 public:
     SineOscillator() : Synth(0), step_size(0), position(0) {}
     SineOscillator(float freq) : Synth(freq), step_size(step_size_for_freq(freq)), position(0) {}
+    SineOscillator(uint32_t step) : Synth(freq_for_step_size(step)), step_size(step), position(0) {}
 
     void set_frequency(float freq) override {
         frequency = freq;
@@ -45,77 +48,79 @@ private:
     uint32_t position;
 };
 
-
-class AdditiveSynth : public Synth {
-private:
-    size_t num_harmonics;
-    float* harmonics;
-    int16_t* amplitudes_fractions;
-    SineOscillator* oscillators;
-protected:
-    void initialize_harmonics(size_t num_harmonics, float* harmonics, int16_t* amplitudes_fractions) {
-        this->num_harmonics = num_harmonics;
-        this->harmonics = new float[num_harmonics];
-        this->amplitudes_fractions = new int16_t[num_harmonics];
-        this->oscillators = new SineOscillator[num_harmonics];
-        for (size_t i = 0; i < num_harmonics; i++) {
-            this->harmonics[i] = harmonics[i];
-            this->amplitudes_fractions[i] = amplitudes_fractions[i];
-            this->oscillators[i] = SineOscillator(this->frequency * harmonics[i]);
-        }
+constexpr float base_freq = 261.63; // C4
+constexpr int lowest_note = -12*3; // C1
+constexpr int highest_note = 12*2; // C6
+constexpr int base_freq_idx = -lowest_note;
+constexpr int lowest_tonewheel_note = lowest_note - 12;
+constexpr int highest_tonewheel_note = highest_note + 12*3;
+constexpr int num_tonewheel_notes = highest_tonewheel_note - lowest_tonewheel_note + 1;
+constexpr std::array<uint32_t, num_tonewheel_notes> organ_step_sizes = []() {
+    std::array<uint32_t, num_tonewheel_notes> step_sizes{};
+    int idx = 0;
+    for (int note = lowest_tonewheel_note; note < highest_tonewheel_note; note++) {
+        float freq = base_freq * std::pow(2.0f, note / 12.0f);
+        step_sizes[idx++] = step_size_for_freq(freq);
     }
-
-public:
-    AdditiveSynth() : Synth(0), num_harmonics(0), harmonics(nullptr), amplitudes_fractions(nullptr), oscillators(nullptr) {};
-    AdditiveSynth(float freq) : Synth(freq), num_harmonics(0), harmonics(nullptr), amplitudes_fractions(nullptr), oscillators(nullptr) {};
-    AdditiveSynth(float freq, size_t num_harmonics, float* harmonics, int16_t* amplitudes_fractions)
-        : Synth(freq) {
-        initialize_harmonics(num_harmonics, harmonics, amplitudes_fractions);
+    return step_sizes;
+}();
+constexpr int harmonics[] = {-12*2, -12, 0, 7, 12, 19, 24, 28, 31, 36}; // frequencies multiples {.25, .5, 1, 1.5, 2, 3, 4, 5, 6, 8};
+constexpr float amplitudes_unnormalized[] = {0.6, 0.3, 1, 0.5, .3, .2, .1, .1, .1, .1};
+constexpr int num_harmonics = sizeof(harmonics) / sizeof(harmonics[0]);
+constexpr std::array<int16_t, num_harmonics> amplitudes = []() {
+    std::array<float, num_harmonics> amps{};
+    float sum_amplitudes = 0;
+    for (float amp : amplitudes_unnormalized) {
+        sum_amplitudes += amp;
     }
-
-    ~AdditiveSynth() {
-        delete[] harmonics;
-        delete[] amplitudes_fractions;
-        delete[] oscillators;
+    sum_amplitudes *= 10; // Slightly increase the sum to avoid clipping
+    for (size_t i = 0; i < num_harmonics; i++) {
+        amps[i] = amplitudes_unnormalized[i] / sum_amplitudes;
     }
-
-    int16_t next_sample() override {
-        int16_t sample = 0;
-        for (size_t i = 0; i < num_harmonics; i++) {
-            sample += oscillators[i].next_sample() / amplitudes_fractions[i];
-        }
-        return sample;
+    std::array<int16_t, num_harmonics> amps_int{};
+    for (size_t i = 0; i < num_harmonics; i++) {
+        amps_int[i] = static_cast<int16_t>(amps[i] * 32767); // Scale to int16_t range
     }
+    return amps_int;
+}();
 
-    void reset() override {
-        for (size_t i = 0; i < num_harmonics; i++) {
-            oscillators[i].reset();
+class OrganSynth {
+    public:
+        OrganSynth(){
+            for (int i = 0; i < num_tonewheel_notes; i++) {
+                tonewheels[i] = SineOscillator(organ_step_sizes[i]);
+            }
         }
+    template <uint32_t buffer_size>
+    std::array<int16_t, buffer_size> next_samples(std::vector<int> &notes_idxs) {
+        std::array<int16_t, num_tonewheel_notes> tonewheel_amplitudes = {0};
+        std::array<uint8_t, num_tonewheel_notes> active_idx {};
+        int active_count = 0;
+        for (int i = 0; i < notes_idxs.size(); i++) {
+            if (notes_idxs[i] < lowest_tonewheel_note || notes_idxs[i] > highest_tonewheel_note) {
+                continue;
+            }
+            int idx = notes_idxs[i] - lowest_tonewheel_note;
+            for (int h = 0; h < num_harmonics; h++) {
+                int harmonic_idx = idx + harmonics[h];
+                if (tonewheel_amplitudes[harmonic_idx] <= 0){
+                    active_idx[active_count++] = harmonic_idx;
+                }
+                tonewheel_amplitudes[harmonic_idx] += amplitudes[h];
+            }
+        }
+        std::array<int32_t, buffer_size> samples_32{};
+        for (int j = 0; j < buffer_size; j++) {
+            for (int i = 0; i < active_count; i++) {
+                samples_32[j] += tonewheels[active_idx[i]].next_sample() * tonewheel_amplitudes[active_idx[i]];
+            }
+        }
+        std::array<int16_t, buffer_size> samples{};
+        for (int j = 0; j < buffer_size; j++) {
+            samples[j] = samples_32[j] >> 16; // Normalize the sample to int16_t range
+        }
+        return samples;
     }
-};
-
-class OrganSynth : public AdditiveSynth {
-public:
-    OrganSynth() : AdditiveSynth(0) {};
-    OrganSynth(float freq) : AdditiveSynth(freq) {
-        float harmonics[] = {.25, .5, 1, 1.5, 2, 3, 4, 5, 6, 8};
-        float amplitudes[] = {0.6, 0.3, 1, 0.5, .3, .2, .1, .1, .1, .1};
-        float sum_amplitudes = 0;
-        for (float amp : amplitudes) {
-            sum_amplitudes += amp;
-        }
-        sum_amplitudes *= 1.1; // Slightly increase the sum to avoid clipping
-        for (float& amp : amplitudes) {
-            amp /= sum_amplitudes;
-        }
-        size_t num_harmonics = sizeof(harmonics) / sizeof(harmonics[0]);
-        int16_t amplitudes_fractions[num_harmonics];
-        for (size_t i = 0; i < num_harmonics; i++) {
-            amplitudes_fractions[i] = 1/amplitudes[i];
-        }
-        // for (size_t i = 0; i < num_harmonics; i++) {
-        //     harmonics[i] *= freq;
-        // }
-        this->initialize_harmonics(num_harmonics, harmonics, amplitudes_fractions);
-    };
+    private:
+        std::array<SineOscillator, num_tonewheel_notes> tonewheels;
 };
