@@ -28,15 +28,13 @@ constexpr float freq_for_step_size(uint32_t step) {
     return (float)step / STEP_MULTIPLIER * sine_freq;
 }
 
-consteval std::array<amplitude_t, SINE_WAVE_TABLE_LEN> populate_sine_wave_table() {
+constexpr auto sine_wave_table = [](){
     std::array<amplitude_t, SINE_WAVE_TABLE_LEN> table{};
     for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
         table[i] = static_cast<amplitude_t>(std::cos(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN)));
     }
     return table;
-}
-
-constexpr auto sine_wave_table = populate_sine_wave_table();
+}();
 
 class Synth {
     public:
