@@ -14,20 +14,7 @@
     using amplitude_t = float;
 #endif
 
-#define SINE_WAVE_TABLE_LEN 2048
-#define STEP_MULTIPLIER 0x10000
-#define MAX_POSITION (STEP_MULTIPLIER * SINE_WAVE_TABLE_LEN)
-
-constexpr float sine_freq = AUDIO_SAMPLE_FREQ / (float)SINE_WAVE_TABLE_LEN;
-
-constexpr uint32_t step_size_for_freq(float freq) {
-    return (uint32_t)(freq * STEP_MULTIPLIER / sine_freq);
-}
-
-constexpr float freq_for_step_size(uint32_t step) {
-    return (float)step / STEP_MULTIPLIER * sine_freq;
-}
-
+#define SINE_WAVE_TABLE_LEN 0x1000
 constexpr auto sine_wave_table = [](){
     std::array<amplitude_t, SINE_WAVE_TABLE_LEN> table{};
     for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
@@ -36,31 +23,68 @@ constexpr auto sine_wave_table = [](){
     return table;
 }();
 
+using position_t = fpm::fixed<uint32_t, uint64_t, 19, false>;
+constexpr position_t step_size_for_freq(float freq) {
+    return (position_t)(freq / AUDIO_SAMPLE_FREQ);
+}
+
+constexpr float freq_for_step_size(position_t step) {
+    return (float)step * AUDIO_SAMPLE_FREQ;
+}
+
 class SineOscillator {
 public:
     SineOscillator() : frequency(0), step_size(0), position(0) {}
     SineOscillator(float freq) : frequency(freq), step_size(step_size_for_freq(freq)), position(0) {}
-    SineOscillator(uint32_t step) : frequency(freq_for_step_size(step)), step_size(step), position(0) {}
+    SineOscillator(position_t step) : frequency(freq_for_step_size(step)), step_size(step), position(0) {}
 
     void set_frequency(float freq) {
         frequency = freq;
         step_size = step_size_for_freq(freq);
     }
 
-    amplitude_t next_sample(amplitude_t step_multiplier = 1) {
-        amplitude_t sample = sine_wave_table[position / STEP_MULTIPLIER];
-        position = (position + static_cast<uint32_t>(step_size * step_multiplier)) % MAX_POSITION;
+    void set_step_size(position_t step) {
+        step_size = step;
+        frequency = freq_for_step_size(step);
+    }
+
+    float get_frequency() const {
+        return frequency;
+    }
+
+    position_t get_step_size() const {
+        return step_size;
+    }
+
+    position_t get_position() const {
+        return position;
+    }
+
+    void set_position(position_t pos) {
+        while (pos >= position_t(1)){
+            pos -= 1;
+        }
+        position = pos;
+    }
+
+    amplitude_t next_sample(position_t step_multiplier = position_t(1)) {
+        size_t idx = static_cast<size_t>(position * static_cast<position_t>(SINE_WAVE_TABLE_LEN));
+        amplitude_t sample = sine_wave_table[idx];
+        position += step_size * step_multiplier;
+        while (position >= position_t(1)){
+            position -= 1;
+        }
         return sample;
     }
 
     void reset() {
-        position = 0;
+        position = position_t(0);
     }
 
 private:
     float frequency;
-    uint32_t step_size;
-    uint32_t position;
+    position_t step_size;
+    position_t position;
 };
 
 constexpr float base_freq = 261.63; // C4
@@ -72,8 +96,8 @@ constexpr int base_freq_idx = -lowest_note;
 constexpr int lowest_tonewheel_note = lowest_note - 12*2; // C-1
 constexpr int highest_tonewheel_note = highest_note + 12*3;
 constexpr int num_tonewheel_notes = highest_tonewheel_note - lowest_tonewheel_note + 1;
-constexpr std::array<uint32_t, num_tonewheel_notes> organ_step_sizes = []() {
-    std::array<uint32_t, num_tonewheel_notes> step_sizes{};
+constexpr std::array<position_t, num_tonewheel_notes> organ_step_sizes = []() {
+    std::array<position_t, num_tonewheel_notes> step_sizes{};
     int idx = 0;
     for (int note = lowest_tonewheel_note; note < highest_tonewheel_note; note++) {
         float freq = base_freq * std::pow(2.0f, note / 12.0f);
@@ -103,7 +127,7 @@ constexpr std::array<amplitude_t, num_harmonics> amplitudes = []() {
 
 constexpr auto LESLIE_CUTOFF_IDX = []() {
     float LESLIE_CUTOFF_FREQ = 800.0f; // cross-over frequency for the Leslie effect
-    uint32_t LESLIE_CUTOFF_STEP_SIZE = step_size_for_freq(LESLIE_CUTOFF_FREQ);
+    position_t LESLIE_CUTOFF_STEP_SIZE = step_size_for_freq(LESLIE_CUTOFF_FREQ);
     int j = 0;
     for (auto step_size : organ_step_sizes) {
         if (step_size >= LESLIE_CUTOFF_STEP_SIZE) {
@@ -120,9 +144,14 @@ class OrganSynth {
             for (int i = 0; i < num_tonewheel_notes; i++) {
                 tonewheels[i] = SineOscillator(organ_step_sizes[i]);
             }
-            leslie = SineOscillator(6.8f); // frequency of the leslie effect in Hz
+            leslie_am_HF = SineOscillator(6.7f); // frequency of the leslie effect in Hz
+            leslie_fm_HF = SineOscillator(leslie_am_HF.get_step_size()); // frequency of the leslie effect in Hz
+            leslie_fm_HF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
+            leslie_am_LF = SineOscillator(5.5f); // frequency of the leslie effect in Hz
+            leslie_fm_LF = SineOscillator(leslie_am_LF.get_step_size()); // frequency of the leslie effect in Hz
+            leslie_fm_LF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
         }
-    template <uint32_t buffer_size>
+    template <size_t buffer_size>
     std::array<amplitude_t, buffer_size> next_samples(std::vector<int> &notes_idxs) {
         std::array<amplitude_t, num_tonewheel_notes> tonewheel_amplitudes = {amplitude_t(0)};
         std::array<uint8_t, num_tonewheel_notes> active_idx {};
@@ -143,17 +172,20 @@ class OrganSynth {
         std::array<amplitude_t, buffer_size> samples{};
         int current_idx = 0;
         for (int j = 0; j < buffer_size; j++) {
-            amplitude_t leslie_sample = leslie.next_sample();
-            int leslie_modulation_HF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
-            int leslie_modulation_LF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
-            amplitude_t leslie_amp_modulation_HF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
-            amplitude_t leslie_amp_modulation_LF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
+            amplitude_t leslie_am__HF_sample = leslie_am_HF.next_sample();
+            amplitude_t leslie_fm_HF_sample = leslie_fm_HF.next_sample();
+            position_t leslie_freq_modulation_HF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0036) * amplitude_t(leslie_am__HF_sample));
+            amplitude_t leslie_amp_modulation_HF = amplitude_t(.75) + amplitude_t(.25) * amplitude_t(leslie_fm_HF_sample);
+            amplitude_t leslie_am_LF_sample = leslie_am_LF.next_sample();
+            amplitude_t leslie_fm_LF_sample = leslie_fm_LF.next_sample();
+            position_t leslie_freq_modulation_LF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0026) * amplitude_t(leslie_am_LF_sample));
+            amplitude_t leslie_amp_modulation_LF = amplitude_t(.85) + amplitude_t(.15) * amplitude_t(leslie_fm_LF_sample);
             for (int i = 0; i < active_count; i++) {
                 current_idx = active_idx[i];
                 if (current_idx < LESLIE_CUTOFF_IDX) {
-                    samples[j] += tonewheels[current_idx].next_sample(leslie_modulation_LF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_LF;
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_LF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_LF;
                 } else {
-                    samples[j] += tonewheels[current_idx].next_sample(leslie_modulation_HF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_HF;
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_HF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_HF;
                 }
             }
         }
@@ -161,5 +193,8 @@ class OrganSynth {
     }
     private:
         std::array<SineOscillator, num_tonewheel_notes> tonewheels;
-        SineOscillator leslie;
+        SineOscillator leslie_am_HF;
+        SineOscillator leslie_fm_HF;
+        SineOscillator leslie_am_LF;
+        SineOscillator leslie_fm_LF;
 };
