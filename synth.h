@@ -36,39 +36,24 @@ constexpr auto sine_wave_table = [](){
     return table;
 }();
 
-class Synth {
-    public:
-        Synth() : frequency(0) {}
-        Synth(float freq) : frequency(freq) {}
-        virtual amplitude_t next_sample() {
-            return amplitude_t(0);
-        };
-        virtual void set_frequency(float freq) {
-            frequency = freq;
-        }
-        virtual void reset() {};
-    protected:
-        float frequency;
-};
-
-class SineOscillator : public Synth {
+class SineOscillator {
 public:
-    SineOscillator() : Synth(0), step_size(0), position(0) {}
-    SineOscillator(float freq) : Synth(freq), step_size(step_size_for_freq(freq)), position(0) {}
-    SineOscillator(uint32_t step) : Synth(freq_for_step_size(step)), step_size(step), position(0) {}
+    SineOscillator() : frequency(0), step_size(0), position(0) {}
+    SineOscillator(float freq) : frequency(freq), step_size(step_size_for_freq(freq)), position(0) {}
+    SineOscillator(uint32_t step) : frequency(freq_for_step_size(step)), step_size(step), position(0) {}
 
-    void set_frequency(float freq) override {
+    void set_frequency(float freq) {
         frequency = freq;
         step_size = step_size_for_freq(freq);
     }
 
-    amplitude_t next_sample() override {
+    amplitude_t next_sample(amplitude_t step_multiplier = 1) {
         amplitude_t sample = sine_wave_table[position / STEP_MULTIPLIER];
-        position = (position + step_size) % MAX_POSITION;
+        position = (position + static_cast<uint32_t>(step_size * step_multiplier)) % MAX_POSITION;
         return sample;
     }
 
-    void reset() override {
+    void reset() {
         position = 0;
     }
 
@@ -116,12 +101,26 @@ constexpr std::array<amplitude_t, num_harmonics> amplitudes = []() {
     return amps_int;
 }();
 
+constexpr auto LESLIE_CUTOFF_IDX = []() {
+    float LESLIE_CUTOFF_FREQ = 800.0f; // cross-over frequency for the Leslie effect
+    uint32_t LESLIE_CUTOFF_STEP_SIZE = step_size_for_freq(LESLIE_CUTOFF_FREQ);
+    int j = 0;
+    for (auto step_size : organ_step_sizes) {
+        if (step_size >= LESLIE_CUTOFF_STEP_SIZE) {
+            return j;
+        }
+        j++;
+    }
+    return j;
+}();
+
 class OrganSynth {
     public:
         OrganSynth(){
             for (int i = 0; i < num_tonewheel_notes; i++) {
                 tonewheels[i] = SineOscillator(organ_step_sizes[i]);
             }
+            leslie = SineOscillator(6.8f); // frequency of the leslie effect in Hz
         }
     template <uint32_t buffer_size>
     std::array<amplitude_t, buffer_size> next_samples(std::vector<int> &notes_idxs) {
@@ -142,13 +141,25 @@ class OrganSynth {
             }
         }
         std::array<amplitude_t, buffer_size> samples{};
+        int current_idx = 0;
         for (int j = 0; j < buffer_size; j++) {
+            amplitude_t leslie_sample = leslie.next_sample();
+            int leslie_modulation_HF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
+            int leslie_modulation_LF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
+            amplitude_t leslie_amp_modulation_HF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
+            amplitude_t leslie_amp_modulation_LF = amplitude_t(.9) + amplitude_t(.1) * leslie_sample;
             for (int i = 0; i < active_count; i++) {
-                samples[j] += tonewheels[active_idx[i]].next_sample() * tonewheel_amplitudes[active_idx[i]];
+                current_idx = active_idx[i];
+                if (current_idx < LESLIE_CUTOFF_IDX) {
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_modulation_LF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_LF;
+                } else {
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_modulation_HF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_HF;
+                }
             }
         }
         return samples;
     }
     private:
         std::array<SineOscillator, num_tonewheel_notes> tonewheels;
+        SineOscillator leslie;
 };
