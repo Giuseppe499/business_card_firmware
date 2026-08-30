@@ -19,11 +19,7 @@ bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_C
 #include "pico/audio_spdif.h"
 #endif
 
-#if USE_AUDIO_SPDIF || USE_AUDIO_I2S
-    #define AUDIO_SAMPLE_FREQ 44100
-#else
-    #define AUDIO_SAMPLE_FREQ 24000
-#endif
+#define AUDIO_SAMPLE_FREQ 24000
 
 struct audio_buffer_pool *init_audio();
 
