@@ -104,8 +104,8 @@ constexpr std::array<position_t, num_tonewheel_notes> organ_step_sizes = []() {
     }
     return step_sizes;
 }();
-constexpr int harmonics[] = {-12*2, -12, 0, 7, 12, 19, 24, 28, 31, 36}; // frequencies multiples {.25, .5, 1, 1.5, 2, 3, 4, 5, 6, 8};
-constexpr float amplitudes_unnormalized[] = {0.6, 0.3, 1, 0.5, .3, .2, .1, .1, .1, .1};
+constexpr int harmonics[] = {-12, 0, 7, 12, 19, 24, 28, 31, 36}; // frequencies multiples {.5, 1, 1.5, 2, 3, 4, 5, 6, 8};
+constexpr float amplitudes_unnormalized[] = {0.5, 1, 0.5, .3, .2, .1, .1, .1, .1};
 constexpr int num_harmonics = sizeof(harmonics) / sizeof(harmonics[0]);
 constexpr std::array<amplitude_t, num_harmonics> amplitudes = []() {
     std::array<float, num_harmonics> amps{};
