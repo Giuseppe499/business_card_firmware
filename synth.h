@@ -87,18 +87,18 @@ private:
 };
 
 constexpr float base_freq = 261.63; // C4
-constexpr int lowest_octave = -2; // C1
-constexpr int lowest_note = 12*lowest_octave; // C1
-constexpr int highest_octave = 2; // C6
-constexpr int highest_note = 12*(highest_octave+1); // C6
+constexpr int lowest_octave = -2;
+constexpr int lowest_note = 12*lowest_octave;
+constexpr int highest_octave = 2;
+constexpr int highest_note = 12*highest_octave;
 constexpr int base_freq_idx = -lowest_note;
-constexpr int lowest_tonewheel_note = lowest_note - 12*2; // C-1
-constexpr int highest_tonewheel_note = highest_note + 12*3;
+constexpr int lowest_tonewheel_note = lowest_note - 12;
+constexpr int highest_tonewheel_note = highest_note + 12 + 6;
 constexpr int num_tonewheel_notes = highest_tonewheel_note - lowest_tonewheel_note + 1;
 constexpr std::array<position_t, num_tonewheel_notes> organ_step_sizes = []() {
     std::array<position_t, num_tonewheel_notes> step_sizes{};
     int idx = 0;
-    for (int note = lowest_tonewheel_note; note < highest_tonewheel_note; note++) {
+    for (int note = lowest_tonewheel_note; note <= highest_tonewheel_note; note++) {
         float freq = base_freq * std::pow(2.0f, note / 12.0f);
         step_sizes[idx++] = step_size_for_freq(freq);
     }
@@ -165,14 +165,14 @@ class OrganSynth {
     static PreparedNotes prepare_notes(const std::vector<int> &notes_idxs) {
         PreparedNotes notes;
         for (int note_idx : notes_idxs) {
-            if (note_idx < lowest_tonewheel_note || note_idx > highest_tonewheel_note) {
-                continue;
-            }
             int idx = note_idx - lowest_tonewheel_note;
             for (int h = 0; h < num_harmonics; h++) {
                 int harmonic_idx = idx + harmonics[h];
-                if (harmonic_idx < 0 || harmonic_idx >= num_tonewheel_notes) {
-                    continue;
+                while (harmonic_idx >= num_tonewheel_notes) {
+                    harmonic_idx -= 12; // wrap around to the previous octave
+                }
+                while (harmonic_idx < 0) {
+                    harmonic_idx += 12; // wrap around to the next octave
                 }
                 if (notes.tonewheel_amplitudes[harmonic_idx] <= amplitude_t(0)) {
                     notes.active_idx[notes.active_count++] = harmonic_idx;
