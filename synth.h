@@ -213,11 +213,14 @@ class OrganSynth {
         return samples;
     }
 
-    void set_leslie_phases(position_t am_hf, position_t fm_hf, position_t am_lf, position_t fm_lf) {
-        leslie_am_HF.set_position(am_hf);
-        leslie_fm_HF.set_position(fm_hf);
-        leslie_am_LF.set_position(am_lf);
-        leslie_fm_LF.set_position(fm_lf);
+    void shift_leslie_phase_HF(position_t phase_shift) {
+        leslie_am_HF.set_position(leslie_am_HF.get_position() + phase_shift);
+        leslie_fm_HF.set_position(leslie_fm_HF.get_position() + phase_shift);
+    }
+
+    void shift_leslie_phase_LF(position_t phase_shift) {
+        leslie_am_LF.set_position(leslie_am_LF.get_position() + phase_shift);
+        leslie_fm_LF.set_position(leslie_fm_LF.get_position() + phase_shift);
     }
 
     private:
@@ -237,11 +240,8 @@ struct StereoSamples {
 class StereoOrganSynth {
 public:
     StereoOrganSynth() {
-        right.set_leslie_phases(
-            static_cast<position_t>(.5),
-            static_cast<position_t>(.75),
-            static_cast<position_t>(.125),
-            static_cast<position_t>(.375));
+        right.shift_leslie_phase_HF(static_cast<position_t>(.5)); // phase shift the right channel by 180 degrees
+        right.shift_leslie_phase_LF(static_cast<position_t>(.125)); // phase shift the right channel by 45 degrees
     }
 
     template <size_t buffer_size>
