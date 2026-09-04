@@ -78,9 +78,14 @@ public:
         }
     }
 
-    amplitude_t next_sample(position_t step_multiplier = position_t(1)) {
+    amplitude_t get_sample() {
         size_t idx = static_cast<size_t>(position * static_cast<position_t>(SINE_WAVE_TABLE_LEN));
         amplitude_t sample = sine_wave_table[idx];
+        return sample;
+    }
+
+    amplitude_t next_sample(position_t step_multiplier = position_t(1)) {
+        amplitude_t sample = get_sample();
         position += step_size * step_multiplier;
         while (position >= position_t(1)){
             position -= 1;
@@ -244,6 +249,10 @@ class OrganSynth {
         leslie_fm_LF.set_position(leslie_fm_LF.get_position() + phase_shift);
     }
 
+    amplitude_t get_leslie_sample() {
+        return amplitude_t(0.8) * (leslie_am_LF.get_sample() + amplitude_t(0.2) * leslie_am_HF.get_sample());
+    }
+
     private:
         std::array<SineOscillator, num_tonewheel_notes> tonewheels;
         SineOscillator leslie_am_HF;
@@ -279,6 +288,10 @@ public:
         left.leslie_target_step_size_LF = target_step_size_LF;
         right.leslie_target_step_size_HF = target_step_size_HF;
         right.leslie_target_step_size_LF = target_step_size_LF;
+    }
+
+    amplitude_t get_leslie_sample() {
+        return left.get_leslie_sample();
     }
 
 private:

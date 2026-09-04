@@ -14,6 +14,7 @@
 #if PICO_ON_DEVICE
 
 #include "hardware/gpio.h"
+#include "hardware/pwm.h"
 constexpr uint KEYBOARD_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
 constexpr int N_KEYBOARD = sizeof(KEYBOARD_PINS) / sizeof(KEYBOARD_PINS[0]);
 constexpr uint FUNCTION_PINS[] = {16,17,18,19,20,21,22};
@@ -26,6 +27,8 @@ constexpr uint OCTAVE_DOWN_FUNC_PIN_IDX = 1;
 constexpr uint TREMOLO_FUNC_PIN_IDX = 4;
 constexpr uint LESLIE_OFF_FUNC_PIN_IDX = 5;
 constexpr uint CHORALE_FUNC_PIN_IDX = 6;
+
+constexpr uint16_t LED_PWM_WRAP =  std::numeric_limits<uint16_t>::max();
 
 #endif
 
@@ -54,10 +57,15 @@ int main() {
     stdio_init_all();
 
     #if PICO_ON_DEVICE
-    // Turn on the built-in LED
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+    uint led_slice = pwm_gpio_to_slice_num(PICO_DEFAULT_LED_PIN);
+    uint led_channel = pwm_gpio_to_channel(PICO_DEFAULT_LED_PIN);
+    gpio_set_function(PICO_DEFAULT_LED_PIN, GPIO_FUNC_PWM);
+    pwm_config led_config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&led_config, 4.0f);
+    pwm_config_set_wrap(&led_config, LED_PWM_WRAP);
+    pwm_init(led_slice, &led_config, true);
+    uint16_t led_level = .8f * LED_PWM_WRAP;
+
     // Setup GPIO for volume and octave buttons
     for (uint gpio_pin : FUNCTION_PINS){
         gpio_init(gpio_pin);
@@ -83,6 +91,8 @@ int main() {
 #if USE_AUDIO_PWM
         enum audio_correction_mode m = audio_pwm_get_correction_mode();
 #endif
+        led_level = static_cast<uint16_t>((.5f + .5f * organ_synth.get_leslie_sample()) / 255 * vol * LED_PWM_WRAP);
+        pwm_set_chan_level(led_slice, led_channel, led_level);
         int c = getchar_timeout_us(0);
         if (c >= 0) {
             if (c == '-' && vol) change_volume(vol, -4);

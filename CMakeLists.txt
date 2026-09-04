@@ -51,6 +51,7 @@ target_include_directories(main PRIVATE ${CMAKE_SOURCE_DIR}/fpm/include)
 # pull in common dependencies
 target_link_libraries(main
     pico_stdlib
+    hardware_pwm
     pico_bootsel_via_double_reset
     pico_audio_i2s
 )
