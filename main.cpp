@@ -16,13 +16,16 @@
 #include "hardware/gpio.h"
 constexpr uint KEYBOARD_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
 constexpr int N_KEYBOARD = sizeof(KEYBOARD_PINS) / sizeof(KEYBOARD_PINS[0]);
-constexpr uint FUNCTION_PINS[] = {16,17,18,19};
+constexpr uint FUNCTION_PINS[] = {16,17,18,19,20,21,22};
 constexpr int N_FUNCTION = sizeof(FUNCTION_PINS) / sizeof(FUNCTION_PINS[0]);
 bool FUNCTION_PINS_STATE[N_FUNCTION] = {false};
 constexpr uint VOL_UP_FUNC_PIN_IDX = 2;
 constexpr uint VOL_DOWN_FUNC_PIN_IDX = 3;
 constexpr uint OCTAVE_UP_FUNC_PIN_IDX = 0;
 constexpr uint OCTAVE_DOWN_FUNC_PIN_IDX = 1;
+constexpr uint TREMOLO_FUNC_PIN_IDX = 4;
+constexpr uint LESLIE_OFF_FUNC_PIN_IDX = 5;
+constexpr uint CHORALE_FUNC_PIN_IDX = 6;
 
 #endif
 
@@ -115,6 +118,15 @@ int main() {
         if (get_function_pressed(VOL_DOWN_FUNC_PIN_IDX)) change_volume(vol, -4);
         if (get_function_pressed(OCTAVE_UP_FUNC_PIN_IDX)) change_octave(octave_shift, 1);
         if (get_function_pressed(OCTAVE_DOWN_FUNC_PIN_IDX)) change_octave(octave_shift, -1);
+        if (get_function_pressed(CHORALE_FUNC_PIN_IDX)){
+            organ_synth.set_leslie_target_step_sizes(LESLIE_CHORALE_HF_STEP_SIZE, LESLIE_CHORALE_LF_STEP_SIZE);
+        }
+        if (get_function_pressed(TREMOLO_FUNC_PIN_IDX)){
+            organ_synth.set_leslie_target_step_sizes(LESLIE_TREMOLO_HF_STEP_SIZE, LESLIE_TREMOLO_LF_STEP_SIZE);
+        }
+        if (get_function_pressed(LESLIE_OFF_FUNC_PIN_IDX)){
+            organ_synth.set_leslie_target_step_sizes(position_t(0), position_t(0));
+        }
 
         // Read the state of the keyboard buttons and determine which notes are currently pressed
         std::vector<int> notes_idxs;

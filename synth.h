@@ -35,20 +35,18 @@ constexpr float freq_for_step_size(position_t step) {
 
 class SineOscillator {
 public:
-    SineOscillator() : frequency(0), step_size(0), position(0) {}
+    SineOscillator() : step_size(0), position(0) {}
 
     void set_frequency(float freq) {
-        frequency = freq;
         step_size = step_size_for_freq(freq);
     }
 
     void set_step_size(position_t step) {
         step_size = step;
-        frequency = freq_for_step_size(step);
     }
 
     float get_frequency() const {
-        return frequency;
+        return freq_for_step_size(step_size);
     }
 
     position_t get_step_size() const {
@@ -66,6 +64,20 @@ public:
         position = pos;
     }
 
+    void continuous_update_step_size(position_t target_step_size, position_t acceleration) {
+        if (step_size < target_step_size) {
+            step_size += acceleration;
+            if (step_size > target_step_size) {
+                step_size = target_step_size;
+            }
+        } else if (step_size > target_step_size) {
+            step_size -= acceleration;
+            if (step_size < target_step_size) {
+                step_size = target_step_size;
+            }
+        }
+    }
+
     amplitude_t next_sample(position_t step_multiplier = position_t(1)) {
         size_t idx = static_cast<size_t>(position * static_cast<position_t>(SINE_WAVE_TABLE_LEN));
         amplitude_t sample = sine_wave_table[idx];
@@ -81,7 +93,6 @@ public:
     }
 
 private:
-    float frequency;
     position_t step_size;
     position_t position;
 };
@@ -136,6 +147,10 @@ constexpr auto LESLIE_CUTOFF_IDX = []() {
     }
     return j;
 }();
+constexpr auto LESLIE_TREMOLO_HF_STEP_SIZE = step_size_for_freq(6.7f); // frequency of the leslie effect in Hz
+constexpr auto LESLIE_TREMOLO_LF_STEP_SIZE = step_size_for_freq(5.8f); // frequency of the leslie effect in Hz
+constexpr auto LESLIE_CHORALE_HF_STEP_SIZE = step_size_for_freq(0.8f); // frequency of the leslie effect in Hz
+constexpr auto LESLIE_CHORALE_LF_STEP_SIZE = step_size_for_freq(0.7f); // frequency of the leslie effect in Hz
 
 struct PreparedNotes {
     std::array<amplitude_t, num_tonewheel_notes> tonewheel_amplitudes{};
@@ -145,22 +160,22 @@ struct PreparedNotes {
 
 class OrganSynth {
     public:
-        OrganSynth(){
-            for (int i = 0; i < num_tonewheel_notes; i++) {
-                tonewheels[i] = SineOscillator();
-                tonewheels[i].set_step_size(organ_step_sizes[i]);
-            }
-            leslie_am_HF = SineOscillator();
-            leslie_am_HF.set_frequency(6.7f); // frequency of the leslie effect in Hz
-            leslie_fm_HF = SineOscillator();
-            leslie_fm_HF.set_step_size(leslie_am_HF.get_step_size()); // frequency of the leslie effect in Hz
-            leslie_fm_HF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
-            leslie_am_LF = SineOscillator();
-            leslie_am_LF.set_frequency(5.5f); // frequency of the leslie effect in Hz
-            leslie_fm_LF = SineOscillator();
-            leslie_fm_LF.set_step_size(leslie_am_LF.get_step_size()); // frequency of the leslie effect in Hz
-            leslie_fm_LF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
+    position_t leslie_target_step_size_HF;
+    position_t leslie_target_step_size_LF;
+    OrganSynth(){
+        for (int i = 0; i < num_tonewheel_notes; i++) {
+            tonewheels[i] = SineOscillator();
+            tonewheels[i].set_step_size(organ_step_sizes[i]);
         }
+        leslie_am_HF = SineOscillator();
+        leslie_fm_HF = SineOscillator();
+        leslie_fm_HF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
+        leslie_target_step_size_HF = position_t(0);
+        leslie_am_LF = SineOscillator();
+        leslie_fm_LF = SineOscillator();
+        leslie_fm_LF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
+        leslie_target_step_size_LF = position_t(0);
+    }
 
     static PreparedNotes prepare_notes(const std::vector<int> &notes_idxs) {
         PreparedNotes notes;
@@ -193,6 +208,12 @@ class OrganSynth {
         std::array<amplitude_t, buffer_size> samples{};
         int current_idx = 0;
         for (int j = 0; j < buffer_size; j++) {
+            // Accelerate or decelerate the leslie effect to reach the target step size
+            leslie_am_HF.continuous_update_step_size(leslie_target_step_size_HF, static_cast<position_t>(2e-9));
+            leslie_fm_HF.set_step_size(leslie_am_HF.get_step_size());
+            leslie_am_LF.continuous_update_step_size(leslie_target_step_size_LF, static_cast<position_t>(7e-10));
+            leslie_fm_LF.set_step_size(leslie_am_LF.get_step_size());
+            // Generate the next sample for the leslie effect
             amplitude_t leslie_am__HF_sample = leslie_am_HF.next_sample();
             amplitude_t leslie_fm_HF_sample = leslie_fm_HF.next_sample();
             position_t leslie_freq_modulation_HF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0036) * amplitude_t(leslie_am__HF_sample));
@@ -251,6 +272,13 @@ public:
             left.render_samples<buffer_size>(notes),
             right.render_samples<buffer_size>(notes)
         };
+    }
+
+    void set_leslie_target_step_sizes(position_t target_step_size_HF, position_t target_step_size_LF) {
+        left.leslie_target_step_size_HF = target_step_size_HF;
+        left.leslie_target_step_size_LF = target_step_size_LF;
+        right.leslie_target_step_size_HF = target_step_size_HF;
+        right.leslie_target_step_size_LF = target_step_size_LF;
     }
 
 private:
