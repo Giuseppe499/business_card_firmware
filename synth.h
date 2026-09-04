@@ -138,6 +138,12 @@ constexpr auto LESLIE_CUTOFF_IDX = []() {
     return j;
 }();
 
+struct PreparedNotes {
+    std::array<amplitude_t, num_tonewheel_notes> tonewheel_amplitudes{};
+    std::array<uint8_t, num_tonewheel_notes> active_idx{};
+    uint8_t active_count = 0;
+};
+
 class OrganSynth {
     public:
         OrganSynth(){
@@ -151,24 +157,35 @@ class OrganSynth {
             leslie_fm_LF = SineOscillator(leslie_am_LF.get_step_size()); // frequency of the leslie effect in Hz
             leslie_fm_LF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
         }
-    template <size_t buffer_size>
-    std::array<amplitude_t, buffer_size> next_samples(std::vector<int> &notes_idxs) {
-        std::array<amplitude_t, num_tonewheel_notes> tonewheel_amplitudes = {amplitude_t(0)};
-        std::array<uint8_t, num_tonewheel_notes> active_idx {};
-        int active_count = 0;
-        for (int i = 0; i < notes_idxs.size(); i++) {
-            if (notes_idxs[i] < lowest_tonewheel_note || notes_idxs[i] > highest_tonewheel_note) {
+
+    static PreparedNotes prepare_notes(const std::vector<int> &notes_idxs) {
+        PreparedNotes notes;
+        for (int note_idx : notes_idxs) {
+            if (note_idx < lowest_tonewheel_note || note_idx > highest_tonewheel_note) {
                 continue;
             }
-            int idx = notes_idxs[i] - lowest_tonewheel_note;
+            int idx = note_idx - lowest_tonewheel_note;
             for (int h = 0; h < num_harmonics; h++) {
                 int harmonic_idx = idx + harmonics[h];
-                if (tonewheel_amplitudes[harmonic_idx] <= amplitude_t(0)){
-                    active_idx[active_count++] = harmonic_idx;
+                if (harmonic_idx < 0 || harmonic_idx >= num_tonewheel_notes) {
+                    continue;
                 }
-                tonewheel_amplitudes[harmonic_idx] += amplitudes[h];
+                if (notes.tonewheel_amplitudes[harmonic_idx] <= amplitude_t(0)) {
+                    notes.active_idx[notes.active_count++] = harmonic_idx;
+                }
+                notes.tonewheel_amplitudes[harmonic_idx] += amplitudes[h];
             }
         }
+        return notes;
+    }
+
+    template <size_t buffer_size>
+    std::array<amplitude_t, buffer_size> next_samples(const std::vector<int> &notes_idxs) {
+        return render_samples<buffer_size>(prepare_notes(notes_idxs));
+    }
+
+    template <size_t buffer_size>
+    std::array<amplitude_t, buffer_size> render_samples(const PreparedNotes &notes) {
         std::array<amplitude_t, buffer_size> samples{};
         int current_idx = 0;
         for (int j = 0; j < buffer_size; j++) {
@@ -180,21 +197,59 @@ class OrganSynth {
             amplitude_t leslie_fm_LF_sample = leslie_fm_LF.next_sample();
             position_t leslie_freq_modulation_LF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0026) * amplitude_t(leslie_am_LF_sample));
             amplitude_t leslie_amp_modulation_LF = amplitude_t(.85) + amplitude_t(.15) * amplitude_t(leslie_fm_LF_sample);
-            for (int i = 0; i < active_count; i++) {
-                current_idx = active_idx[i];
+            for (int i = 0; i < notes.active_count; i++) {
+                current_idx = notes.active_idx[i];
                 if (current_idx < LESLIE_CUTOFF_IDX) {
-                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_LF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_LF;
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_LF) * notes.tonewheel_amplitudes[current_idx] * leslie_amp_modulation_LF;
                 } else {
-                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_HF) * tonewheel_amplitudes[current_idx] * leslie_amp_modulation_HF;
+                    samples[j] += tonewheels[current_idx].next_sample(leslie_freq_modulation_HF) * notes.tonewheel_amplitudes[current_idx] * leslie_amp_modulation_HF;
                 }
             }
         }
         return samples;
     }
+
+    void set_leslie_phases(position_t am_hf, position_t fm_hf, position_t am_lf, position_t fm_lf) {
+        leslie_am_HF.set_position(am_hf);
+        leslie_fm_HF.set_position(fm_hf);
+        leslie_am_LF.set_position(am_lf);
+        leslie_fm_LF.set_position(fm_lf);
+    }
+
     private:
         std::array<SineOscillator, num_tonewheel_notes> tonewheels;
         SineOscillator leslie_am_HF;
         SineOscillator leslie_fm_HF;
         SineOscillator leslie_am_LF;
         SineOscillator leslie_fm_LF;
+};
+
+template <size_t buffer_size>
+struct StereoSamples {
+    std::array<amplitude_t, buffer_size> left;
+    std::array<amplitude_t, buffer_size> right;
+};
+
+class StereoOrganSynth {
+public:
+    StereoOrganSynth() {
+        right.set_leslie_phases(
+            static_cast<position_t>(.5),
+            static_cast<position_t>(.75),
+            static_cast<position_t>(.125),
+            static_cast<position_t>(.375));
+    }
+
+    template <size_t buffer_size>
+    StereoSamples<buffer_size> next_samples(const std::vector<int> &notes_idxs) {
+        PreparedNotes notes = OrganSynth::prepare_notes(notes_idxs);
+        return {
+            left.render_samples<buffer_size>(notes),
+            right.render_samples<buffer_size>(notes)
+        };
+    }
+
+private:
+    OrganSynth left;
+    OrganSynth right;
 };

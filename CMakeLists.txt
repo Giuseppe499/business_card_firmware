@@ -64,8 +64,6 @@ pico_enable_stdio_uart(main 0)
 
 target_compile_definitions(main PRIVATE
             # compile time configuration of I2S
-            PICO_AUDIO_I2S_MONO_INPUT=1
-            #define for our example code
             USE_AUDIO_I2S=1
             PICO_AUDIO_I2S_DATA_PIN=6
             PICO_AUDIO_I2S_CLOCK_PIN_BASE=14

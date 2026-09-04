@@ -22,12 +22,12 @@ struct audio_buffer_pool *init_audio() {
 #if USE_AUDIO_I2S || USE_AUDIO_PWM
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
 #endif
-            .channel_count = 1,
+            .channel_count = 2,
     };
 
     static struct audio_buffer_format producer_format = {
             .format = &audio_format,
-            .sample_stride = 2
+            .sample_stride = 4 // 2 channels * 2 bytes per sample (int16)
     };
 
     struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3,
