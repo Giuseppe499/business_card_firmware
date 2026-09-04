@@ -7,7 +7,7 @@
 #include <vector>
 #include <fpm/fixed.hpp>
 
-#define USE_FIXED_POINT
+// #define USE_FIXED_POINT // On the rp2040, fixed point math is faster than float
 #ifdef USE_FIXED_POINT
     using amplitude_t = fpm::fixed<int32_t, int32_t, 16, false>;
 #else
