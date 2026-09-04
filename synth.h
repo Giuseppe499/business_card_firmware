@@ -10,8 +10,10 @@
 // #define USE_FIXED_POINT // On the rp2040, fixed point math is faster than float
 #ifdef USE_FIXED_POINT
     using amplitude_t = fpm::fixed<int32_t, int32_t, 16, false>;
+    using position_t = fpm::fixed<uint32_t, uint64_t, 19, false>;
 #else
     using amplitude_t = float;
+    using position_t = float;
 #endif
 
 #define SINE_WAVE_TABLE_LEN 0x1000
@@ -23,7 +25,6 @@ constexpr auto sine_wave_table = [](){
     return table;
 }();
 
-using position_t = fpm::fixed<uint32_t, uint64_t, 19, false>;
 constexpr position_t step_size_for_freq(float freq) {
     return (position_t)(freq / AUDIO_SAMPLE_FREQ);
 }
@@ -35,8 +36,6 @@ constexpr float freq_for_step_size(position_t step) {
 class SineOscillator {
 public:
     SineOscillator() : frequency(0), step_size(0), position(0) {}
-    SineOscillator(float freq) : frequency(freq), step_size(step_size_for_freq(freq)), position(0) {}
-    SineOscillator(position_t step) : frequency(freq_for_step_size(step)), step_size(step), position(0) {}
 
     void set_frequency(float freq) {
         frequency = freq;
@@ -148,13 +147,18 @@ class OrganSynth {
     public:
         OrganSynth(){
             for (int i = 0; i < num_tonewheel_notes; i++) {
-                tonewheels[i] = SineOscillator(organ_step_sizes[i]);
+                tonewheels[i] = SineOscillator();
+                tonewheels[i].set_step_size(organ_step_sizes[i]);
             }
-            leslie_am_HF = SineOscillator(6.7f); // frequency of the leslie effect in Hz
-            leslie_fm_HF = SineOscillator(leslie_am_HF.get_step_size()); // frequency of the leslie effect in Hz
+            leslie_am_HF = SineOscillator();
+            leslie_am_HF.set_frequency(6.7f); // frequency of the leslie effect in Hz
+            leslie_fm_HF = SineOscillator();
+            leslie_fm_HF.set_step_size(leslie_am_HF.get_step_size()); // frequency of the leslie effect in Hz
             leslie_fm_HF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
-            leslie_am_LF = SineOscillator(5.5f); // frequency of the leslie effect in Hz
-            leslie_fm_LF = SineOscillator(leslie_am_LF.get_step_size()); // frequency of the leslie effect in Hz
+            leslie_am_LF = SineOscillator();
+            leslie_am_LF.set_frequency(5.5f); // frequency of the leslie effect in Hz
+            leslie_fm_LF = SineOscillator();
+            leslie_fm_LF.set_step_size(leslie_am_LF.get_step_size()); // frequency of the leslie effect in Hz
             leslie_fm_LF.set_position(static_cast<position_t>(.25)); // phase shift the FM oscillator by 90 degrees
         }
 
