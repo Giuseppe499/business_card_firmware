@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Initialise pico_sdk from installed location
@@ -73,9 +73,6 @@ target_compile_definitions(main PRIVATE
 #            PICO_DEFAULT_UART_TX_PIN=28
 #            PICO_DEFAULT_UART_RX_PIN=29
             )
-
-# Enable C++20 features
-target_compile_features(main PRIVATE cxx_std_20)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(main)
