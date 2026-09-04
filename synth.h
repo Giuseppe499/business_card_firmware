@@ -285,3 +285,13 @@ private:
     OrganSynth left;
     OrganSynth right;
 };
+
+inline amplitude_t soft_clip(amplitude_t x){
+    if (x > amplitude_t(1)) {
+        return amplitude_t(1);
+    } else if (x < amplitude_t(-1)) {
+        return amplitude_t(-1);
+    } else {
+        return x * (.5 * x * x - 1.5);
+    }
+}
