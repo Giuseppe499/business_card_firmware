@@ -80,7 +80,7 @@ int main() {
     }
     #endif
 
-    uint vol = 64;
+    uint vol = 48;
     int octave_shift = 0;
 
     StereoOrganSynth organ_synth;
@@ -152,9 +152,9 @@ int main() {
         StereoSamples<SAMPLES_PER_BUFFER> organ_samples = organ_synth.next_samples<SAMPLES_PER_BUFFER>(notes_idxs);
         for (uint i = 0; i < buffer->max_sample_count; i++) {
             // Left
-            samples[2 * i + 0] = static_cast<int16_t>(soft_clip(organ_samples.left[i] / 255 * vol) * 32767);
+            samples[2 * i + 0] = static_cast<int16_t>(soft_clip(organ_samples.left[i] / 128 * vol) * 32767);
             // Right
-            samples[2 * i + 1] = static_cast<int16_t>(soft_clip(organ_samples.right[i] / 255 * vol) * 32767);
+            samples[2 * i + 1] = static_cast<int16_t>(soft_clip(organ_samples.right[i] / 128 * vol) * 32767);
         }
         buffer->sample_count = buffer->max_sample_count;
         give_audio_buffer(ap, buffer);
