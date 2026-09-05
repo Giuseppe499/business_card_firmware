@@ -19,7 +19,6 @@ constexpr uint KEYBOARD_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
 constexpr int N_KEYBOARD = sizeof(KEYBOARD_PINS) / sizeof(KEYBOARD_PINS[0]);
 constexpr uint FUNCTION_PINS[] = {16,17,18,19,20,21,22};
 constexpr int N_FUNCTION = sizeof(FUNCTION_PINS) / sizeof(FUNCTION_PINS[0]);
-bool FUNCTION_PINS_STATE[N_FUNCTION] = {false};
 constexpr uint VOL_UP_FUNC_PIN_IDX = 2;
 constexpr uint VOL_DOWN_FUNC_PIN_IDX = 3;
 constexpr uint OCTAVE_UP_FUNC_PIN_IDX = 0;
@@ -46,11 +45,36 @@ void change_octave(int &octave_shift, int delta) {
     octave_shift = new_octave;
 }
 
+bool function_pins_state[N_FUNCTION] = {false};
+uint64_t function_next_repeat[N_FUNCTION] = {};
+constexpr uint64_t REPEAT_DELAY_US = 400000; // 400 ms
+constexpr uint64_t REPEAT_RATE_US = 30000;   // 60 ms
 bool get_function_pressed(uint func_pin_idx) {
-    auto current_state = gpio_get(FUNCTION_PINS[func_pin_idx]);
-    auto pressed = current_state && !FUNCTION_PINS_STATE[func_pin_idx];
-    FUNCTION_PINS_STATE[func_pin_idx] = current_state;
-    return pressed;
+    bool current_state = gpio_get(FUNCTION_PINS[func_pin_idx]);
+    uint64_t now = time_us_64();
+
+    if (!current_state) {
+        function_pins_state[func_pin_idx] = false;
+        function_next_repeat[func_pin_idx] = 0;
+        return false;
+    }
+
+    // Immediate action on the initial press.
+    if (!function_pins_state[func_pin_idx]) {
+        function_pins_state[func_pin_idx] = true;
+        function_next_repeat[func_pin_idx] =
+            now + REPEAT_DELAY_US;
+        return true;
+    }
+
+    // Continuous action while held.
+    if (now >= function_next_repeat[func_pin_idx]) {
+        function_next_repeat[func_pin_idx] =
+            now + REPEAT_RATE_US;
+        return true;
+    }
+
+    return false;
 }
 
 int main() {
