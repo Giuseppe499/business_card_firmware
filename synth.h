@@ -5,16 +5,9 @@
 #include <tuple>
 #include <array>
 #include <vector>
-#include <fpm/fixed.hpp>
 
-// #define USE_FIXED_POINT // On the rp2040, fixed point math is faster than float
-#ifdef USE_FIXED_POINT
-    using amplitude_t = fpm::fixed<int32_t, int32_t, 16, false>;
-    using position_t = fpm::fixed<uint32_t, uint64_t, 19, false>;
-#else
-    using amplitude_t = float;
-    using position_t = float;
-#endif
+using amplitude_t = float;
+using position_t = float;
 
 #define SINE_WAVE_TABLE_LEN 0x1000
 constexpr auto sine_wave_table = [](){
