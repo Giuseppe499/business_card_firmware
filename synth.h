@@ -157,6 +157,9 @@ constexpr auto LESLIE_TREMOLO_LF_STEP_SIZE = step_size_for_freq(5.8f); // freque
 constexpr auto LESLIE_CHORALE_HF_STEP_SIZE = step_size_for_freq(0.8f); // frequency of the leslie effect in Hz
 constexpr auto LESLIE_CHORALE_LF_STEP_SIZE = step_size_for_freq(0.7f); // frequency of the leslie effect in Hz
 
+constexpr amplitude_t LESLIE_HF_DETUNE_FACTOR = amplitude_t(1) / amplitude_t(LESLIE_TREMOLO_HF_STEP_SIZE);
+constexpr amplitude_t LESLIE_LF_DETUNE_FACTOR = amplitude_t(1) / amplitude_t(LESLIE_TREMOLO_LF_STEP_SIZE);
+
 struct PreparedNotes {
     std::array<amplitude_t, num_tonewheel_notes> tonewheel_amplitudes{};
     std::array<uint8_t, num_tonewheel_notes> active_idx{};
@@ -221,11 +224,11 @@ class OrganSynth {
             // Generate the next sample for the leslie effect
             amplitude_t leslie_am__HF_sample = leslie_am_HF.next_sample();
             amplitude_t leslie_fm_HF_sample = leslie_fm_HF.next_sample();
-            position_t leslie_freq_modulation_HF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0036) * amplitude_t(leslie_am__HF_sample));
+            position_t leslie_freq_modulation_HF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0036) * amplitude_t(leslie_am__HF_sample) * (amplitude_t(leslie_fm_HF.get_step_size())*LESLIE_HF_DETUNE_FACTOR));
             amplitude_t leslie_amp_modulation_HF = amplitude_t(.75) + amplitude_t(.25) * amplitude_t(leslie_fm_HF_sample);
             amplitude_t leslie_am_LF_sample = leslie_am_LF.next_sample();
             amplitude_t leslie_fm_LF_sample = leslie_fm_LF.next_sample();
-            position_t leslie_freq_modulation_LF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0026) * amplitude_t(leslie_am_LF_sample));
+            position_t leslie_freq_modulation_LF = static_cast<position_t>(amplitude_t(1) + amplitude_t(.0026) * amplitude_t(leslie_am_LF_sample) * (amplitude_t(leslie_fm_LF.get_step_size())*LESLIE_LF_DETUNE_FACTOR));
             amplitude_t leslie_amp_modulation_LF = amplitude_t(.85) + amplitude_t(.15) * amplitude_t(leslie_fm_LF_sample);
             for (int i = 0; i < notes.active_count; i++) {
                 current_idx = notes.active_idx[i];
