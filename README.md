@@ -1,3 +1,10 @@
+# Organ synth business card: firmware
+
+This repository contains the C++ firmware for my organ synth business card.
+The firmware is designed to run on the rp2354 microcontroller with a PCM5102A DAC, and a custom resistive touch keyboard.
+
+The complete repository (including the KiCad hardware files) can be found [here](https://github.com/Giuseppe499/business_card).
+
 # Fedora dependencies
 
 To install the required dependencies on Fedora, run the following command:
