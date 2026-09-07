@@ -15,7 +15,7 @@
 
 #include "hardware/gpio.h"
 #include "hardware/pwm.h"
-constexpr uint KEYBOARD_PINS[] = {0,1,2,3,4,5,7,8,9,10,11,12,13};
+constexpr uint KEYBOARD_PINS[] = {1,2,3,4,5,7,8,9,10,11,12,13};
 constexpr int N_KEYBOARD = sizeof(KEYBOARD_PINS) / sizeof(KEYBOARD_PINS[0]);
 constexpr uint FUNCTION_PINS[] = {16,17,18,19,20,21,22};
 constexpr int N_FUNCTION = sizeof(FUNCTION_PINS) / sizeof(FUNCTION_PINS[0]);
