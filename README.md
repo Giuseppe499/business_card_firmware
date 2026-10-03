@@ -5,6 +5,18 @@ The firmware is designed to run on the rp2354 microcontroller with a PCM5102A DA
 
 The complete repository (including the KiCad hardware files) can be found [here](https://github.com/Giuseppe499/business_card).
 
+# What it does
+
+Each key sums a harmonic series read from a single sine wavetable generated at
+compile time with `constexpr`.
+A two-rotor Leslie simulation applies doppler-based amplitude and frequency modulation. A `tanh` soft clipper is applied to the stereo output.
+
+The [main repository](https://github.com/Giuseppe499/business_card) describes
+the synthesis in more detail.
+
+The target board is `pico2` (RP2350). RP2040 is no longer supported: the synth
+moved from fixed-point arithmetic to the RP2350 floating-point unit.
+
 # Fedora dependencies
 
 To install the required dependencies on Fedora, run the following command:
@@ -59,3 +71,13 @@ The pi pico should automatically reset, start in bootloader mode, and flash the 
 If picotool fails to detect the device, or to reset it, the firmware might have crashed.
 In this case, you can manually reset the device (e.g., by unplugging and plugging it back in) while holding the `BOOTSEL` button.
 At this point, you can run the `picotool` command to flash the firmware.
+
+# Audio backend
+
+The audio layer supports I2S, PWM and S/PDIF. I2S is the default, selected in
+`CMakeLists.txt` with `USE_AUDIO_I2S=1`. The other two back ends compile but are
+untested on this board.
+
+# License
+
+[GPL-3.0](LICENSE).
